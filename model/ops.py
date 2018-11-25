@@ -54,4 +54,3 @@ def dropout(x, rate, training):
 
 def relu(x):
     return tf.nn.relu(x)
-

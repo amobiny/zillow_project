@@ -14,8 +14,10 @@ class DataLoader(object):
         self.cfg = cfg
         project_path = os.path.dirname(os.path.realpath(__file__))
         if not os.path.exists(project_path + cfg.data_dir):
-            os.makedirs(cfg.data_dir)
+            os.makedirs(project_path + cfg.data_dir)
+            print('Please wait; generating HDF5 data .......')
             generate_data()
+            print('Data generated successfully!')
         self.data_file = project_path + '/data/zillow_data.h5'
         if cfg.normalize:
             self.get_stats()
@@ -51,6 +53,7 @@ class DataLoader(object):
         else:
             h5f = h5py.File(self.data_file, 'r')
             self.x_test = h5f['X_test'][:]
+            self.test_id = h5f['test_id'][:].reshape([-1, 1])
             h5f.close()
             self.num_te = self.x_test.shape[0]
             if self.cfg.normalize:
@@ -71,6 +74,7 @@ class DataLoader(object):
         permutation = np.random.permutation(self.y_train.shape[0])
         self.x_train = self.x_train[permutation, :]
         self.y_train = self.y_train[permutation]
+
 
 def normalize(data, mean, std):
     return (data - mean) / std

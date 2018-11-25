@@ -3,6 +3,7 @@ import os
 import numpy as np
 from DataLoader import DataLoader, denormalize
 from model.ops import fc_layer, relu, dropout
+import csv
 
 
 class RegresNet(object):
@@ -98,11 +99,12 @@ class RegresNet(object):
         self.best_validation_loss = 1000
         if self.conf.reload_Epoch > 0:
             self.reload(self.conf.reload_Epoch)
-        print('----> Training')
 
         self.data_reader = DataLoader(self.conf)
         self.num_train_batch = int(self.data_reader.num_tr / self.conf.batch_size)
         self.num_val_batch = int(self.data_reader.num_val / self.conf.val_batch_size)
+
+        print('----> Training')
 
         for epoch in range(self.conf.reload_Epoch, self.conf.max_epoch):
             self.data_reader.randomize()
@@ -136,13 +138,13 @@ class RegresNet(object):
         summary_valid = self.sess.run(self.merged_summary, feed_dict=feed_dict)
         valid_loss = self.sess.run(self.mean_loss)
         self.save_summary(summary_valid, train_step, mode='valid')
+        print('-' * 25 + 'Validation' + '-' * 25)
         if valid_loss < self.best_validation_loss:
             self.best_validation_loss = valid_loss
             improved_str = '(improved)'
             self.save(epoch)
         else:
             improved_str = ''
-        print('-' * 25 + 'Validation' + '-' * 25)
         print('After {0} epoch(s): val_loss= {1:.4f}, {2}'
               .format(epoch, valid_loss, improved_str))
         print('-' * 60)
@@ -160,6 +162,7 @@ class RegresNet(object):
                          self.is_training_pl: False, self.keep_prob_pl: 1}
             prediction[start:end] = self.sess.run(self.y_pred, feed_dict=feed_dict)
         prediction = denormalize(prediction, self.data_reader.output_mean, self.data_reader.output_std)
+        self.write_to_csv(prediction)
 
     def save(self, epoch):
         print('----> Saving the model after epoch #{0}'.format(epoch))
@@ -177,5 +180,12 @@ class RegresNet(object):
         self.saver.restore(self.sess, model_path)
         print('----> Model successfully restored')
 
-
-
+    def write_to_csv(self, preds):
+        print('Saving the results into prediction.csv file')
+        preds = preds.astype(np.int32).reshape([-1, 1])
+        data = np.concatenate((self.data_reader.test_id, preds), axis=1)
+        head = np.array(['PropertyID', 'SaleDollarCnt']).reshape([1, 2])
+        data = np.concatenate((head, data), axis=0)
+        f = open('prediction.csv', 'w')
+        for row in data:
+            csv.writer(f).writerow(row)

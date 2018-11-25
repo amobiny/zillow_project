@@ -22,6 +22,7 @@ def generate_data():
 
     train_data = read_csv_file(train_path)
     test_data = read_csv_file(test_path)
+    test_id = test_data[:, 0]
 
     # replace all the missing values in the 13th column with 0
     train_data[train_data[:, 13] == 'NA', 13] = 0
@@ -63,6 +64,7 @@ def generate_data():
     h5f.create_dataset('X_train', data=X_train)
     h5f.create_dataset('y_train', data=y_train)
     h5f.create_dataset('X_test', data=X_test)
+    h5f.create_dataset('test_id', data=test_id)
     h5f.close()
 
 

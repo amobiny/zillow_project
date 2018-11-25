@@ -8,7 +8,7 @@ from utils.run_utils import write_spec
 def main(_):
     if args.mode not in ['train', 'test']:
         print('invalid mode: ', args.mode)
-        print("Please input a mode: train, test, or predict")
+        print("Please input a mode: train or test")
     else:
         model = Model(tf.Session(), args)
         if not os.path.exists(args.modeldir+args.run_name):
@@ -20,8 +20,6 @@ def main(_):
             model.train()
         elif args.mode == 'test':
             model.test(epoch_num=args.reload_Epoch)
-
-
 
 
 if __name__ == '__main__':
