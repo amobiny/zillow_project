@@ -1,8 +1,7 @@
 import tensorflow as tf
-from tqdm import tqdm
 import os
 import numpy as np
-
+from DataLoader import DataLoader, denormalize
 from model.ops import fc_layer, relu, dropout
 
 
@@ -22,23 +21,24 @@ class RegresNet(object):
     def create_placeholders(self):
         with tf.name_scope('Input'):
             self.inputs_pl = tf.placeholder(tf.float32, self.input_shape, name='input')
-            self.labels_pl = tf.placeholder(tf.int64, self.output_shape, name='annotation')
+            self.labels_pl = tf.placeholder(tf.float32, self.output_shape, name='output')
             self.is_training_pl = tf.placeholder(tf.bool, name="is_training")
             self.keep_prob_pl = tf.placeholder(tf.float32)
 
     def build_network(self):
-        self.summary_list = []
-        x, s_list = fc_layer(self.inputs_pl, self.conf.hidden_units[0], 'FC1', self.conf.add_reg, self.conf.lmbda)
-        self.summary_list.append(s_list)
-        x = relu(x)
-        x = dropout(x, 1 - self.keep_prob_pl, self.is_training_pl)
-        for i in range(self.conf.num_hidden_layers - 1):
-            x, s_list = fc_layer(x, self.conf.hidden_units[i], 'FC'+str(i+2), self.conf.add_reg, self.conf.lmbda)
+        with tf.name_scope('Network'):
+            self.summary_list = []
+            x, s_list = fc_layer(self.inputs_pl, self.conf.hidden_units[0], 'FC1', self.conf.add_reg, self.conf.lmbda)
             self.summary_list.append(s_list)
             x = relu(x)
             x = dropout(x, 1 - self.keep_prob_pl, self.is_training_pl)
-        self.y_pred, s_list = fc_layer(x, 1, 'OUT', self.conf.add_reg, self.conf.lmbda)
-        self.summary_list.append(s_list)
+            for i in range(self.conf.num_hidden_layers - 1):
+                x, s_list = fc_layer(x, self.conf.hidden_units[i], 'FC'+str(i+2), self.conf.add_reg, self.conf.lmbda)
+                self.summary_list.append(s_list)
+                x = relu(x)
+                x = dropout(x, 1 - self.keep_prob_pl, self.is_training_pl)
+            self.y_pred, s_list = fc_layer(x, 1, 'OUT', self.conf.add_reg, self.conf.lmbda)
+            self.summary_list.append(s_list)
 
     def loss_func(self):
         with tf.name_scope('Loss'):
@@ -46,6 +46,8 @@ class RegresNet(object):
                 with tf.name_scope('mse'):
                     loss = tf.reduce_mean(tf.losses.mean_squared_error(labels=self.labels_pl,
                                                                        predictions=tf.squeeze(self.y_pred)))
+            elif self.conf.loss_type == 'mae':
+                loss = tf.reduce_mean(tf.abs(self.labels_pl - tf.squeeze(self.y_pred)))
             if self.conf.add_reg:
                 with tf.name_scope('L2_loss'):
                     l2_loss = tf.reduce_sum(
@@ -96,16 +98,15 @@ class RegresNet(object):
     def train(self):
         self.sess.run(tf.local_variables_initializer())
         self.best_validation_loss = 1000
-        if self.conf.reload_step > 0:
-            self.reload(self.conf.reload_step)
-            print('----> Continue Training from step #{}'.format(self.conf.reload_step))
-        else:
-            print('----> Start Training')
-        from DataLoader import DataLoader
+        if self.conf.reload_Epoch > 0:
+            self.reload(self.conf.reload_Epoch)
+        print('----> Training')
+
         self.data_reader = DataLoader(self.conf)
         self.num_train_batch = int(self.data_reader.num_tr / self.conf.batch_size)
         self.num_val_batch = int(self.data_reader.num_val / self.conf.val_batch_size)
-        for epoch in range(self.conf.max_epoch):
+
+        for epoch in range(self.conf.reload_Epoch, self.conf.max_epoch):
             self.data_reader.randomize()
             for train_step in range(self.num_train_batch):
                 glob_step = epoch * self.num_train_batch + train_step
@@ -119,43 +120,58 @@ class RegresNet(object):
                                                       self.mean_loss_op,
                                                       self.merged_summary], feed_dict=feed_dict)
                     loss = self.sess.run(self.mean_loss)
-                    self.save_summary(summary, glob_step + self.conf.reload_step, mode='train')
+                    self.save_summary(summary, glob_step, mode='train')
                     print('step: {0:<6}, train_loss= {1:.4f}'.format(train_step, loss))
                 else:
                     self.sess.run([self.train_op, self.mean_loss_op], feed_dict=feed_dict)
-            self.evaluate(glob_step)
+            self.evaluate(epoch, glob_step)
 
-    def evaluate(self, train_step):
+    def evaluate(self, epoch, train_step):
         self.sess.run(tf.local_variables_initializer())
         for step in range(self.num_val_batch):
-            start = step * self.conf.batch_size
-            end = (step + 1) * self.conf.batch_size
+            start = step * self.conf.val_batch_size
+            end = (step + 1) * self.conf.val_batch_size
             x_val, y_val = self.data_reader.next_batch(start, end, mode='valid')
             feed_dict = {self.inputs_pl: x_val, self.labels_pl: y_val,
                          self.is_training_pl: False, self.keep_prob_pl: 1}
             self.sess.run(self.mean_loss_op, feed_dict=feed_dict)
         summary_valid = self.sess.run(self.merged_summary, feed_dict=feed_dict)
         valid_loss = self.sess.run(self.mean_loss)
-        self.save_summary(summary_valid, train_step + self.conf.reload_step, mode='valid')
+        self.save_summary(summary_valid, train_step, mode='valid')
         if valid_loss < self.best_validation_loss:
             self.best_validation_loss = valid_loss
             improved_str = '(improved)'
-            self.save(train_step + self.conf.reload_step)
+            self.save(epoch)
         else:
             improved_str = ''
-
         print('-' * 25 + 'Validation' + '-' * 25)
-        print('After {0} training step: val_loss= {1:.4f}, {2}'
-              .format(train_step, valid_loss, improved_str))
+        print('After {0} epoch(s): val_loss= {1:.4f}, {2}'
+              .format(epoch, valid_loss, improved_str))
+        print('-' * 60)
 
-    def save(self, step):
-        print('----> Saving the model at step #{0}'.format(step))
-        checkpoint_path = os.path.join(self.conf.modeldir + self.conf.run_name, self.conf.model_name)
-        self.saver.save(self.sess, checkpoint_path, global_step=step)
+    def test(self, epoch_num):
+        self.sess.run(tf.local_variables_initializer())
+        self.data_reader = DataLoader(self.conf)
+        self.num_test_batch = int(self.data_reader.num_te / self.conf.test_batch_size)
+        prediction = np.zeros((self.data_reader.num_te))
+        for step in range(self.num_test_batch):
+            start = step * self.conf.test_batch_size
+            end = (step + 1) * self.conf.test_batch_size
+            x_te = self.data_reader.next_batch(start, end, mode='test')
+            feed_dict = {self.inputs_pl: x_te,
+                         self.is_training_pl: False, self.keep_prob_pl: 1}
+            prediction[start:end] = np.squeeze(self.sess.run(self.y_pred, feed_dict=feed_dict))
+        prediction = denormalize(prediction, self.data_reader.output_mean, self.data_reader.output_std)
 
-    def reload(self, step):
+    def save(self, epoch):
+        print('----> Saving the model after epoch #{0}'.format(epoch))
         checkpoint_path = os.path.join(self.conf.modeldir + self.conf.run_name, self.conf.model_name)
-        model_path = checkpoint_path + '-' + str(step)
+        self.saver.save(self.sess, checkpoint_path, global_step=epoch)
+
+    def reload(self, epoch):
+        print('----> Loading the model trained for {} epochs'.format(self.conf.reload_Epoch))
+        checkpoint_path = os.path.join(self.conf.modeldir + self.conf.run_name, self.conf.model_name)
+        model_path = checkpoint_path + '-' + str(epoch)
         if not os.path.exists(model_path + '.meta'):
             print('----> No such checkpoint found', model_path)
             return

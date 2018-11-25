@@ -3,20 +3,21 @@ import tensorflow as tf
 flags = tf.app.flags
 
 
-flags.DEFINE_string('mode', 'train', 'train or test')
-flags.DEFINE_integer('reload_step', 0, 'Reload step to continue training')
+flags.DEFINE_string('mode', 'test', 'train or test')
+flags.DEFINE_integer('reload_Epoch', 26, 'Reload the model trained for Epoch epochs')
 
-flags.DEFINE_integer('max_epoch', 300, '# of step for training')
+flags.DEFINE_integer('max_epoch', 30, '# of step for training')
 flags.DEFINE_integer('SUMMARY_FREQ', 100, 'Number of step to save summary')
 flags.DEFINE_float('init_lr', 1e-3, 'Initial learning rate')
 flags.DEFINE_float('lr_min', 1e-5, 'Minimum learning rate')
 
 # Hyper-parameters
-flags.DEFINE_string('loss_type', 'mse', 'Loss type; either mse or mae')
-flags.DEFINE_boolean('add_reg', False, 'Use L2 regularization on network parameters')
+flags.DEFINE_string('loss_type', 'mae', 'Loss type; either mse or mae')
+flags.DEFINE_boolean('add_reg', True, 'Use L2 regularization on network parameters')
 flags.DEFINE_float('lmbda', 1e-4, 'L2 regularization coefficient')
-flags.DEFINE_integer('batch_size', 32, 'training batch size')
+flags.DEFINE_integer('batch_size', 20, 'training batch size')
 flags.DEFINE_integer('val_batch_size', 100, 'training batch size')
+flags.DEFINE_integer('test_batch_size', 27, 'test batch size')
 flags.DEFINE_float('keep_prob', 0.2, 'Probability of keeping a unit in drop-out')
 flags.DEFINE_boolean('normalize', True, 'Whether to normalize the data or not')
 flags.DEFINE_integer('num_hidden_layers', 2, 'Number of hidden fully-connected layers')

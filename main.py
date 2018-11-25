@@ -6,7 +6,7 @@ from utils.run_utils import write_spec
 
 
 def main(_):
-    if args.mode not in ['train', 'test', 'predict']:
+    if args.mode not in ['train', 'test']:
         print('invalid mode: ', args.mode)
         print("Please input a mode: train, test, or predict")
     else:
@@ -19,7 +19,7 @@ def main(_):
             write_spec(args)
             model.train()
         elif args.mode == 'test':
-            model.test(step_num=args.reload_step)
+            model.test(epoch_num=args.reload_Epoch)
 
 
 

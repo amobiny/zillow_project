@@ -19,7 +19,7 @@ class DataLoader(object):
         self.data_file = project_path + '/data/zillow_data.h5'
         if cfg.normalize:
             self.get_stats()
-        self.get_data(mode='train')
+        self.get_data(mode=cfg.mode)
 
     def next_batch(self, start, end, mode='train'):
         if mode == 'train':
@@ -74,3 +74,7 @@ class DataLoader(object):
 
 def normalize(data, mean, std):
     return (data - mean) / std
+
+
+def denormalize(data, mean, std):
+    return (data * std) + mean
