@@ -1,0 +1,5 @@
+model: run4
+optimizer: Adam
+learning_rate: 0.001 : 1e-05
+batch_size: 20
+keep_prob: 0.7

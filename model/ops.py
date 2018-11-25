@@ -25,15 +25,6 @@ def bias_variable(name, shape):
                            initializer=initial)
 
 
-def fc_layer(x, num_units, layer_name, add_reg, lmbda):
-    with tf.name_scope(layer_name):
-        regularizer = None
-        if add_reg:
-            regularizer = tf.contrib.layers.l2_regularizer(scale=lmbda)
-        net = tf.layers.dense(inputs=x, units=num_units, kernel_regularizer=regularizer)
-        print('{}: {}'.format(layer_name, net.get_shape()))
-        return net
-
 def fc_layer(x, out_dim, layer_name, add_reg, lmbda):
     """
     Creates a fully-connected layer
@@ -52,11 +43,15 @@ def fc_layer(x, out_dim, layer_name, add_reg, lmbda):
         summary_list.append(tf.summary.histogram('b_' + layer_name, biases))
         if add_reg:
             tf.add_to_collection('reg_weights', weights)
+        print('{}: {}'.format(layer_name, x.get_shape()))
     return x, summary_list
+
 
 def dropout(x, rate, training):
     """Create a dropout layer."""
     return tf.layers.dropout(inputs=x, rate=rate, training=training)
 
+
 def relu(x):
     return tf.nn.relu(x)
+

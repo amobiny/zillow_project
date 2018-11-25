@@ -30,14 +30,15 @@ class RegresNet(object):
             self.summary_list = []
             x, s_list = fc_layer(self.inputs_pl, self.conf.hidden_units[0], 'FC1', self.conf.add_reg, self.conf.lmbda)
             self.summary_list.append(s_list)
-            x = relu(x)
             x = dropout(x, 1 - self.keep_prob_pl, self.is_training_pl)
+            x = relu(x)
             for i in range(self.conf.num_hidden_layers - 1):
-                x, s_list = fc_layer(x, self.conf.hidden_units[i], 'FC'+str(i+2), self.conf.add_reg, self.conf.lmbda)
+                x, s_list = fc_layer(x, self.conf.hidden_units[i+1], 'FC'+str(i+2), self.conf.add_reg, self.conf.lmbda)
                 self.summary_list.append(s_list)
-                x = relu(x)
                 x = dropout(x, 1 - self.keep_prob_pl, self.is_training_pl)
-            self.y_pred, s_list = fc_layer(x, 1, 'OUT', self.conf.add_reg, self.conf.lmbda)
+                x = relu(x)
+            y_pred, s_list = fc_layer(x, 1, 'OUT', self.conf.add_reg, self.conf.lmbda)
+            self.y_pred = tf.squeeze(y_pred)
             self.summary_list.append(s_list)
 
     def loss_func(self):
@@ -45,9 +46,9 @@ class RegresNet(object):
             if self.conf.loss_type == 'mse':
                 with tf.name_scope('mse'):
                     loss = tf.reduce_mean(tf.losses.mean_squared_error(labels=self.labels_pl,
-                                                                       predictions=tf.squeeze(self.y_pred)))
+                                                                       predictions=self.y_pred))
             elif self.conf.loss_type == 'mae':
-                loss = tf.reduce_mean(tf.abs(self.labels_pl - tf.squeeze(self.y_pred)))
+                loss = tf.reduce_mean(tf.abs(self.labels_pl - self.y_pred))
             if self.conf.add_reg:
                 with tf.name_scope('L2_loss'):
                     l2_loss = tf.reduce_sum(
@@ -68,12 +69,10 @@ class RegresNet(object):
         self.learning_rate = tf.maximum(learning_rate, self.conf.lr_min)
         with tf.name_scope('Optimizer'):
             optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
-            update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-            with tf.control_dependencies(update_ops):
-                self.train_op = optimizer.minimize(self.total_loss, global_step=global_step)
+            self.train_op = optimizer.minimize(self.total_loss, global_step=global_step)
         self.sess.run(tf.global_variables_initializer())
-        trainable_vars = tf.trainable_variables()
-        self.saver = tf.train.Saver(var_list=trainable_vars, max_to_keep=1000)
+        self.sess.run(tf.local_variables_initializer())
+        self.saver = tf.train.Saver(var_list=tf.trainable_variables(), max_to_keep=1000)
         self.train_writer = tf.summary.FileWriter(self.conf.logdir + self.conf.run_name + '/train/', self.sess.graph)
         self.valid_writer = tf.summary.FileWriter(self.conf.logdir + self.conf.run_name + '/valid/')
         self.configure_summary()
@@ -96,7 +95,6 @@ class RegresNet(object):
         self.sess.run(tf.local_variables_initializer())
 
     def train(self):
-        self.sess.run(tf.local_variables_initializer())
         self.best_validation_loss = 1000
         if self.conf.reload_Epoch > 0:
             self.reload(self.conf.reload_Epoch)
@@ -160,7 +158,7 @@ class RegresNet(object):
             x_te = self.data_reader.next_batch(start, end, mode='test')
             feed_dict = {self.inputs_pl: x_te,
                          self.is_training_pl: False, self.keep_prob_pl: 1}
-            prediction[start:end] = np.squeeze(self.sess.run(self.y_pred, feed_dict=feed_dict))
+            prediction[start:end] = self.sess.run(self.y_pred, feed_dict=feed_dict)
         prediction = denormalize(prediction, self.data_reader.output_mean, self.data_reader.output_std)
 
     def save(self, epoch):
