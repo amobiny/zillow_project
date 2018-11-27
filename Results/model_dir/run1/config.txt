@@ -1,0 +1,10 @@
+model: run1
+input_dimension: 18
+num_hidden_layers: 2
+num_hidden_units: [256, 32]
+L2_regularization: True
+lambda: 0.0005
+optimizer: Adam
+learning_rate: 0.001 : 1e-05
+batch_size: 32
+keep_prob: 0.7

@@ -15,9 +15,9 @@ class DataLoader(object):
         project_path = os.path.dirname(os.path.realpath(__file__))
         if not os.path.exists(project_path + cfg.data_dir):
             os.makedirs(project_path + cfg.data_dir)
-            print('Please wait; generating HDF5 data .......')
+            print('Please wait; generating HDF5 data files .......')
             generate_data()
-            print('Data generated successfully!')
+            print('HDF5 data file generated successfully!')
         self.data_file = project_path + '/data/zillow_data.h5'
         if cfg.normalize:
             self.get_stats()

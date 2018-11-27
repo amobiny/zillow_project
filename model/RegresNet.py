@@ -34,7 +34,8 @@ class RegresNet(object):
             x = dropout(x, 1 - self.keep_prob_pl, self.is_training_pl)
             x = relu(x)
             for i in range(self.conf.num_hidden_layers - 1):
-                x, s_list = fc_layer(x, self.conf.hidden_units[i+1], 'FC'+str(i+2), self.conf.add_reg, self.conf.lmbda)
+                x, s_list = fc_layer(x, self.conf.hidden_units[i + 1], 'FC' + str(i + 2), self.conf.add_reg,
+                                     self.conf.lmbda)
                 self.summary_list.append(s_list)
                 x = dropout(x, 1 - self.keep_prob_pl, self.is_training_pl)
                 x = relu(x)
@@ -64,7 +65,7 @@ class RegresNet(object):
         global_step = tf.get_variable('global_step', [], initializer=tf.constant_initializer(0), trainable=False)
         learning_rate = tf.train.exponential_decay(self.conf.init_lr,
                                                    global_step,
-                                                   decay_steps=2000,
+                                                   decay_steps=1000,
                                                    decay_rate=0.97,
                                                    staircase=True)
         self.learning_rate = tf.maximum(learning_rate, self.conf.lr_min)
@@ -115,10 +116,10 @@ class RegresNet(object):
                 x_batch, y_batch = self.data_reader.next_batch(start, end, mode='train')
                 feed_dict = {self.inputs_pl: x_batch, self.labels_pl: y_batch,
                              self.is_training_pl: True, self.keep_prob_pl: self.conf.keep_prob}
-                if train_step % self.conf.SUMMARY_FREQ == 0:
+                if train_step and train_step % self.conf.SUMMARY_FREQ == 0:
                     _, _, summary = self.sess.run([self.train_op,
-                                                      self.mean_loss_op,
-                                                      self.merged_summary], feed_dict=feed_dict)
+                                                   self.mean_loss_op,
+                                                   self.merged_summary], feed_dict=feed_dict)
                     loss = self.sess.run(self.mean_loss)
                     self.save_summary(summary, glob_step, mode='train')
                     print('step: {0:<6}, train_loss= {1:.4f}'.format(train_step, loss))
@@ -150,10 +151,12 @@ class RegresNet(object):
         print('-' * 60)
 
     def test(self, epoch_num):
+        self.reload(epoch_num)
         self.sess.run(tf.local_variables_initializer())
+
         self.data_reader = DataLoader(self.conf)
         self.num_test_batch = int(self.data_reader.num_te / self.conf.test_batch_size)
-        prediction = np.zeros((self.data_reader.num_te))
+        prediction = np.zeros(self.data_reader.num_te)
         for step in range(self.num_test_batch):
             start = step * self.conf.test_batch_size
             end = (step + 1) * self.conf.test_batch_size

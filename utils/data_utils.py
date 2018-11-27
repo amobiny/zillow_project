@@ -22,7 +22,7 @@ def generate_data():
 
     train_data = read_csv_file(train_path)
     test_data = read_csv_file(test_path)
-    test_id = test_data[:, 0]
+    test_id = test_data[:, 0].astype(int)
 
     # replace all the missing values in the 13th column with 0
     train_data[train_data[:, 13] == 'NA', 13] = 0
@@ -49,10 +49,13 @@ def generate_data():
 
     # convert values to float
     X_train = X_train.astype(np.float32)
-    X_train = X_train.astype(np.float32)
+    X_test = X_test.astype(np.float32)
 
     # Use 5 nearest rows which have a feature to fill in each row's missing features
     data_incomplete = np.concatenate((X_train, X_test), axis=0)
+    data_m = np.nanmean(data_incomplete, axis=0)
+    data_s = np.nanstd(data_incomplete, axis=0)
+    data_incomplete = (data_incomplete - data_m) / data_s
     data_complete = KNN(k=5).fit_transform(data_incomplete)
     X_train = data_complete[:X_train.shape[0]]
     X_test = data_complete[X_train.shape[0]:]
