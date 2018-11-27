@@ -2,7 +2,6 @@ import tensorflow as tf
 
 flags = tf.app.flags
 
-
 flags.DEFINE_string('mode', 'train', 'train or test')
 flags.DEFINE_integer('reload_Epoch', 0, 'Reload the model trained for Epoch epochs')
 
